@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Διαχείριση · Συνομιλίες</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 22px; flex: 1; }
+  header a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--panel); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .kpi .v { font-size: 26px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .kpi .l { color: var(--muted); font-size: 13px; }
+  .card { background: var(--panel); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--line); margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding-top: 10px; }
+  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; min-width: 0; }
+  .bar i { display: block; width: 100%; max-width: 30px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .bar span { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+  .bar b { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  textarea.input { min-height: 84px; resize: vertical; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); font-weight: 600; padding: 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .pill.active { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .pill.revoked { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .pill.pending { background: var(--panel2); color: var(--muted); }
+  .pill.admin { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .tablewrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .filters .input { max-width: 260px; }
+  .filters select { width: auto; }
+  .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .chan { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .chan:last-child { border-bottom: 0; }
+  .center { min-height: 100vh; display: grid; place-items: center; padding: 16px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="gate" class="center"><div class="muted">Φόρτωση…</div></div>
+
+<div id="dash" class="wrap hidden">
+  <header>
+    <h1>Πίνακας διαχείρισης</h1>
+    <span class="muted" id="updated" style="font-size:13px"></span>
+    <button class="btn ghost sm" id="refresh">↻ Ανανέωση</button>
+    <a href="index.html">← Στις συνομιλίες</a>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Μηνύματα ανά ημέρα (14 ημέρες)</h2>
+      <div class="chart" id="chart"></div>
+    </div>
+    <div class="card">
+      <h2>Δώσε πρόσβαση</h2>
+      <div class="stack">
+        <textarea id="inv" class="input" placeholder="Ένα ή περισσότερα email, χωρισμένα με κόμμα ή νέα γραμμή"></textarea>
+        <input id="invNote" class="input" placeholder="Σημείωση (προαιρετικά, π.χ. τμήμα)">
+        <button class="btn" id="invBtn">Προσθήκη στη λίστα πρόσβασης</button>
+        <div class="muted" style="font-size:13px">Μετά, στείλε τους τον σύνδεσμο της εφαρμογής. Κάνουν <b>Εγγραφή</b> με αυτό το email και διαλέγουν κωδικό.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Χρήστες & πρόσβαση</h2>
+    <div class="filters">
+      <input id="q" class="input" placeholder="Αναζήτηση email ή ονόματος…">
+      <select id="fStatus" class="input">
+        <option value="">Όλοι</option><option value="active">Με πρόσβαση</option><option value="pending">Δεν έχουν εγγραφεί</option><option value="revoked">Ανακλήθηκε</option>
+      </select>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Χρήστης</th><th>Κατάσταση</th><th>Τελευταία δραστηριότητα</th><th class="num">Μηνύματα</th><th></th></tr></thead>
+      <tbody id="users"></tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>Κανάλια (ορατά σε όλους)</h2>
+    <div id="chans"></div>
+    <div class="row" style="margin-top:10px"><input id="chName" class="input" placeholder="Όνομα νέου καναλιού" maxlength="80"><button class="btn" id="chBtn">Δημιουργία</button></div>
+  </div>
+</div>
+<div id="modalRoot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>window.supabase||document.write('<script src="https://unpkg.com/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"><\/script>')</script>
+<script src="config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let D = null, me = null;
+const toast = (msg) => { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
+const ago = (d) => {
+  if (!d) return '<span class="muted">—</span>';
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (m < 3) return '<span style="color:var(--ok);font-weight:600">τώρα</span>';
+  if (m < 60) return `πριν ${m}′`;
+  if (m < 1440) return `πριν ${Math.round(m / 60)} ώρ.`;
+  return new Date(d).toLocaleDateString("el-GR", { day: "numeric", month: "short", year: "2-digit" });
+};
+
+async function init() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) { $("gate").innerHTML = `<div class="stack"><h2>Χρειάζεται σύνδεση</h2><a class="btn" href="index.html">Σύνδεση</a></div>`; return; }
+  me = user;
+  const { data: acc } = await sb.rpc("my_access");
+  if (acc?.role !== "admin" || acc?.status !== "active") { $("gate").innerHTML = `<div class="stack"><h2>Μόνο για διαχειριστές</h2><a href="index.html">← Πίσω</a></div>`; return; }
+  $("gate").classList.add("hidden"); $("dash").classList.remove("hidden");
+  await load();
+  setInterval(load, 30000);
+}
+async function load() {
+  const { data, error } = await sb.rpc("admin_overview");
+  if (error) return toast(error.message);
+  D = data; render();
+  $("updated").textContent = "Ενημερώθηκε " + new Date().toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" });
+}
+function render() {
+  const t = D.totals;
+  const k = [["Με πρόσβαση", t.allowed], ["Εγγεγραμμένοι", t.registered], ["Ενεργοί (24ώρο)", t.online_24h], ["Μηνύματα σήμερα", t.messages_today], ["Σύνολο μηνυμάτων", t.messages], ["Συσκευές με ειδοποιήσεις", t.push_devices], ["Ανακλήσεις", t.revoked]];
+  $("kpis").innerHTML = k.map(([l, v]) => `<div class="kpi"><div class="v">${Number(v).toLocaleString("el-GR")}</div><div class="l">${l}</div></div>`).join("");
+  const max = Math.max(1, ...D.daily.map((d) => d.count));
+  $("chart").innerHTML = D.daily.map((d) => {
+    const dt = new Date(d.day + "T12:00:00");
+    return `<div class="bar" title="${dt.toLocaleDateString("el-GR")}: ${d.count}"><b>${d.count || ""}</b><i style="height:${(d.count / max) * 100}%"></i><span>${dt.getDate()}/${dt.getMonth() + 1}</span></div>`;
+  }).join("");
+  renderUsers();
+  $("chans").innerHTML = D.channels.length ? D.channels.map((c) => `<div class="chan"><b style="flex:1"># ${esc(c.name)}</b><span class="muted" style="font-size:13px">${c.messages} μηνύματα</span><button class="btn ghost sm" data-delchan="${c.id}" data-name="${esc(c.name)}" style="color:var(--danger)">Διαγραφή</button></div>`).join("") : '<div class="muted">Κανένα κανάλι.</div>';
+}
+function renderUsers() {
+  const q = $("q").value.trim().toLowerCase(), f = $("fStatus").value;
+  const rows = D.users.filter((u) => {
+    if (q && !u.email.includes(q) && !(u.display_name || "").toLowerCase().includes(q)) return false;
+    if (f === "active") return u.status === "active" && u.user_id;
+    if (f === "pending") return u.status === "active" && !u.user_id;
+    if (f === "revoked") return u.status === "revoked";
+    return true;
+  });
+  $("users").innerHTML = rows.map((u) => {
+    const self = u.email === me.email.toLowerCase();
+    const st = u.status === "revoked" ? '<span class="pill revoked">Ανακλήθηκε</span>' : u.user_id ? '<span class="pill active">Ενεργός</span>' : '<span class="pill pending">Αναμονή εγγραφής</span>';
+    return `<tr>
+      <td><div style="font-weight:600">${esc(u.display_name || "—")} ${u.role === "admin" ? '<span class="pill admin">Διαχειριστής</span>' : ""}</div><div class="muted" style="font-size:13px">${esc(u.email)}${u.note ? " · " + esc(u.note) : ""}</div></td>
+      <td>${st}</td>
+      <td>${ago(u.last_seen)}</td>
+      <td class="num">${u.messages ?? 0}</td>
+      <td><div class="actions">${self ? '<span class="muted" style="font-size:13px">εσύ</span>' : `
+        ${u.status === "active" ? `<button class="btn ghost sm" data-a="revoke" data-e="${esc(u.email)}" style="color:var(--danger)">Ανάκληση</button>` : `<button class="btn ghost sm" data-a="restore" data-e="${esc(u.email)}">Επαναφορά</button>`}
+        ${u.user_id ? `<button class="btn ghost sm" data-a="reset_password" data-e="${esc(u.email)}">Κωδικός</button>` : ""}
+        <button class="btn ghost sm" data-a="set_role" data-role="${u.role === "admin" ? "member" : "admin"}" data-e="${esc(u.email)}">${u.role === "admin" ? "→ Μέλος" : "→ Admin"}</button>
+        <button class="btn ghost sm" data-a="remove" data-e="${esc(u.email)}" title="Οριστική διαγραφή">🗑</button>`}
+      </div></td></tr>`;
+  }).join("") || `<tr><td colspan="5" class="muted">Κανένα αποτέλεσμα.</td></tr>`;
+}
+$("q").oninput = renderUsers; $("fStatus").onchange = renderUsers; $("refresh").onclick = load;
+
+$("users").onclick = async (e) => {
+  const b = e.target.closest("[data-a]"); if (!b) return;
+  const action = b.dataset.a, email = b.dataset.e; const body = { action, email };
+  if (action === "revoke" && !confirm(`Ανάκληση πρόσβασης για ${email};\nΘα αποσυνδεθεί και δεν θα βλέπει πλέον τις συνομιλίες.`)) return;
+  if (action === "remove" && !confirm(`ΟΡΙΣΤΙΚΗ διαγραφή του ${email} και όλων των μηνυμάτων του;\nΑυτό δεν αναιρείται.`)) return;
+  if (action === "set_role") { body.role = b.dataset.role; if (!confirm(`Αλλαγή ρόλου του ${email} σε ${body.role === "admin" ? "Διαχειριστή" : "Μέλος"};`)) return; }
+  if (action === "reset_password") {
+    const pw = prompt(`Νέος κωδικός για ${email} (τουλάχιστον 8 χαρακτήρες):`, Math.random().toString(36).slice(2, 12));
+    if (!pw) return; body.password = pw;
+  }
+  b.disabled = true;
+  try {
+    await callFn("admin", body);
+    toast(action === "reset_password" ? `Ο νέος κωδικός ορίστηκε: ${body.password}` : "Έγινε ✓");
+    if (action === "reset_password") alert(`Νέος κωδικός για ${email}:\n\n${body.password}\n\nΣτείλ' τον στον χρήστη.`);
+    await load();
+  } catch (err) { toast(err.message); b.disabled = false; }
+};
+$("invBtn").onclick = async () => {
+  const emails = $("inv").value.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+  if (!emails.length) return toast("Γράψε τουλάχιστον ένα email.");
+  $("invBtn").disabled = true;
+  try {
+    const r = await callFn("admin", { action: "invite", emails, note: $("invNote").value.trim() || null });
+    toast(`Προστέθηκαν ${r.added} email ✓`); $("inv").value = ""; $("invNote").value = ""; await load();
+  } catch (err) { toast(err.message); }
+  $("invBtn").disabled = false;
+};
+$("chBtn").onclick = async () => {
+  const n = $("chName").value.trim(); if (!n) return;
+  const { error } = await sb.rpc("create_channel", { channel_name: n });
+  if (error) return toast(error.message);
+  $("chName").value = ""; toast("Το κανάλι δημιουργήθηκε ✓"); load();
+};
+$("chans").onclick = async (e) => {
+  const b = e.target.closest("[data-delchan]"); if (!b) return;
+  if (!confirm(`Διαγραφή του καναλιού #${b.dataset.name} και όλων των μηνυμάτων του;`)) return;
+  const { error } = await sb.from("conversations").delete().eq("id", b.dataset.delchan);
+  if (error) return toast(error.message);
+  toast("Διαγράφηκε ✓"); load();
+};
+init();
+</script>
+</body>
+</html>
